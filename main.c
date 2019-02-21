@@ -64,22 +64,17 @@ void reveal(std::ifstream& filestream, std::ofstream& output_filestream) {
    struct PPMHeader header = getHeader(filestream);
    char c;
    const size_t encoded_filesize = std::atoi(header.comment);
-   const unsigned int octets_count = 4 * encoded_filesize;
-   char buffer[octets_count];
+   const unsigned int encoded_bytes_count = 4 * encoded_filesize;
    std::bitset<8> native_byte, decoded_byte;
    std::bitset<2> subset;
-   for(unsigned int i=1, j=0; i <= octets_count; i++, j+=2) {
+   for(unsigned int i=1, j=0; i <= encoded_bytes_count; i++, j+=2) {
       filestream.get(c);
       native_byte = c;
       subset[0] = native_byte[0];
       subset[1] = native_byte[1];
       decoded_byte[j] = native_byte[0];
       decoded_byte[j + 1] = native_byte[1];
-      //std::cout << "pointer position: " << filestream.tellg() << std::endl;
-      //std::cout << "native byte: " << native_byte << std::endl;
-      //std::cout << "\tsubset: " << subset << std::endl;
       if(i % 4 == 0) {
-         //std::cout << "==============================================" << std::endl;
          output_filestream << char(decoded_byte.to_ulong());
          j = -2;
       }
@@ -97,24 +92,18 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
                      << header.width << " " << header.height << std::endl
                      << "#" << stream_to_hide_size << std::endl
                      << header.max_color_value;
-   // Hide resolution of image to hide
    for(size_t s=0; s < stream_to_hide_size; s++) {
       filestream_to_hide.get(binary_to_hide_char);
       binary_to_hide = binary_to_hide_char;
       for(int i=0; i < 8; i+=2) {
          filestream.get(native_binary_char);
          hidden_binary = native_binary_char;
-         //std::cout << "pointer position: " << filestream.tellg() << std::endl;
-         //std::cout << "native byte: " << hidden_binary << std::endl;
          subset_to_hide[0] = binary_to_hide[i];
          subset_to_hide[1] = binary_to_hide[i + 1];
-         //std::cout << "\tsubset to hide: " << subset_to_hide << std::endl;
          hidden_binary[0] = binary_to_hide[i];
          hidden_binary[1] = binary_to_hide[i + 1];
-         //std::cout << "encoded byte: " << hidden_binary << std::endl;
          output_filestream << char(hidden_binary.to_ulong());
       }
-      //std::getchar();
    }
    for(size_t s=stream_to_hide_size; s < native_stream_size; s++) {
       filestream.get(native_binary_char);
@@ -162,8 +151,4 @@ void dumpHeader(struct PPMHeader& header) {
    std::cout << "Comment: " << header.comment << std::endl;
    std::cout << "width x height: " << header.width << "x" << header.height << std::endl;
    std::cout << "max color value: " << header.max_color_value << std::endl;
-}
-
-void dumpBinary(std::ifstream& filestream) {
-   // Must start at the beginning of the data
 }
