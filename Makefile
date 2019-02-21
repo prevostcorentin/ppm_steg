@@ -4,6 +4,6 @@ EXE_NAME=ppm_steg
 
 .SILENT:
 
-init: lib
+init:
 	@echo Compiling executable $(EXE_NAME) ...
 	$(CC) $(CC_FLAGS) main.c -o $(EXE_NAME)

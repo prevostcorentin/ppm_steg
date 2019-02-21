@@ -7,7 +7,8 @@
 
 
 struct PPMHeader {
-   char type[2];
+   char type[3] = {'\00'};
+   char comment[16] = {'\00'};
    int width, height;
    int max_color_value;
    int size;
@@ -38,14 +39,13 @@ int main(int argc, char **argv) {
    if(action.compare("hide") == 0) {
       std::ifstream filestream_to_hide(argv[3], std::ios::in | std::ios::binary);
       std::ofstream output_filestream(argv[4], std::ios::out | std::ios::binary);
-      std::cout << "writing to " << argv[4];
       if(argc < 5) {
          usage(argv[0]);
          return EXIT_FAILURE;
       }
       hide(filestream, filestream_to_hide, output_filestream);
    } else if(action.compare("reveal") == 0) {
-      std::ofstream output_filestream(argv[4], std::ios::out | std::ios::binary);
+      std::ofstream output_filestream(argv[3], std::ios::out | std::ios::binary);
       if(argc < 4) {
          usage(argv[0]);
          return EXIT_FAILURE;
@@ -61,9 +61,29 @@ int main(int argc, char **argv) {
 
 
 void reveal(std::ifstream& filestream, std::ofstream& output_filestream) {
-   if(filestream.is_open()) {
-      std::cout << "file is open" << std::endl;
-   } 
+   struct PPMHeader header = getHeader(filestream);
+   char c;
+   const size_t encoded_filesize = std::atoi(header.comment);
+   const unsigned int octets_count = 4 * encoded_filesize;
+   char buffer[octets_count];
+   std::bitset<8> native_byte, decoded_byte;
+   std::bitset<2> subset;
+   for(unsigned int i=1, j=0; i <= octets_count; i++, j+=2) {
+      filestream.get(c);
+      native_byte = c;
+      subset[0] = native_byte[0];
+      subset[1] = native_byte[1];
+      decoded_byte[j] = native_byte[0];
+      decoded_byte[j + 1] = native_byte[1];
+      //std::cout << "pointer position: " << filestream.tellg() << std::endl;
+      //std::cout << "native byte: " << native_byte << std::endl;
+      //std::cout << "\tsubset: " << subset << std::endl;
+      if(i % 4 == 0) {
+         //std::cout << "==============================================" << std::endl;
+         output_filestream << char(decoded_byte.to_ulong());
+         j = -2;
+      }
+   }
 }
 
 void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofstream& output_filestream) {
@@ -75,6 +95,7 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
    std::bitset<2> subset_to_hide;
    output_filestream << header.type << std::endl 
                      << header.width << " " << header.height << std::endl
+                     << "#" << stream_to_hide_size << std::endl
                      << header.max_color_value;
    // Hide resolution of image to hide
    for(size_t s=0; s < stream_to_hide_size; s++) {
@@ -83,10 +104,17 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
       for(int i=0; i < 8; i+=2) {
          filestream.get(native_binary_char);
          hidden_binary = native_binary_char;
+         //std::cout << "pointer position: " << filestream.tellg() << std::endl;
+         //std::cout << "native byte: " << hidden_binary << std::endl;
+         subset_to_hide[0] = binary_to_hide[i];
+         subset_to_hide[1] = binary_to_hide[i + 1];
+         //std::cout << "\tsubset to hide: " << subset_to_hide << std::endl;
          hidden_binary[0] = binary_to_hide[i];
          hidden_binary[1] = binary_to_hide[i + 1];
+         //std::cout << "encoded byte: " << hidden_binary << std::endl;
          output_filestream << char(hidden_binary.to_ulong());
       }
+      //std::getchar();
    }
    for(size_t s=stream_to_hide_size; s < native_stream_size; s++) {
       filestream.get(native_binary_char);
@@ -104,10 +132,19 @@ size_t getStreamSize(std::ifstream& filestream) {
 
 struct PPMHeader getHeader(std::ifstream& filestream) {
    struct PPMHeader header;
+   char c;
    char width_buf[4], height_buf[4], max_ascii_val_buf[32];
-   filestream >> header.type >> width_buf >> height_buf >> max_ascii_val_buf;
+   filestream >> header.type >> width_buf >> height_buf;
    header.width = std::atoi(width_buf);
    header.height = std::atoi(height_buf);
+   filestream.seekg(1, filestream.cur);
+   filestream.get(c);
+   if(c == '#') {
+      filestream.getline(header.comment, 16);
+   } else {
+      filestream.seekg(-1, filestream.cur);
+   }
+   filestream >> max_ascii_val_buf;
    header.max_color_value = std::atoi(max_ascii_val_buf);
    return header;
 }
@@ -122,6 +159,7 @@ void dumpHeader(struct PPMHeader& header) {
       std::cout << "Unknown";
    }
    std::cout << " (" << header.type << ")" << std::endl;
+   std::cout << "Comment: " << header.comment << std::endl;
    std::cout << "width x height: " << header.width << "x" << header.height << std::endl;
    std::cout << "max color value: " << header.max_color_value << std::endl;
 }
