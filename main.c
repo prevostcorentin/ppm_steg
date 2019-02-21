@@ -19,13 +19,14 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
 size_t getStreamSize(std::ifstream&);
 struct PPMHeader getHeader(std::ifstream& filestream);
 void dumpHeader(PPMHeader&);
-
+bool isImageHideable(std::ifstream& filestream, std::ifstream& filestream_to_hide);
 
 void usage(const char* program_name) {
-   std::cout << "Hide/reveal ppm image in another ppm image" << std::endl
+   std::cout << "Hide/reveal binary data hiddden in a ppm image" << std::endl
              << "Usage: " << program_name << " [action] [options]" << std::endl
-             << "\thide dst src output_filename - encode an image into another" << std::endl
-             << "\treveal dst output_filename - reveal a hidden image" << std::endl;
+             << "\thide [dst] [src output_filename - encode an image into another" << std::endl
+             << "\treveal dst output_filename - reveal a hidden image" << std::endl
+             << "\tdump filename - dump header of filename" << std::endl;
 }
 
 
@@ -51,6 +52,9 @@ int main(int argc, char **argv) {
          return EXIT_FAILURE;
       }
       reveal(filestream, output_filestream);
+   } else if(action.compare("dump") == 0) {
+      PPMHeader header = getHeader(filestream);
+      dumpHeader(header);
    } else {
       std::cout << "no action named \"" << action << "\"" << std::endl;
       usage(argv[0]);
@@ -66,12 +70,9 @@ void reveal(std::ifstream& filestream, std::ofstream& output_filestream) {
    const size_t encoded_filesize = std::atoi(header.comment);
    const unsigned int encoded_bytes_count = 4 * encoded_filesize;
    std::bitset<8> native_byte, decoded_byte;
-   std::bitset<2> subset;
    for(unsigned int i=1, j=0; i <= encoded_bytes_count; i++, j+=2) {
       filestream.get(c);
       native_byte = c;
-      subset[0] = native_byte[0];
-      subset[1] = native_byte[1];
       decoded_byte[j] = native_byte[0];
       decoded_byte[j + 1] = native_byte[1];
       if(i % 4 == 0) {
@@ -87,19 +88,20 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
    const size_t native_stream_size = getStreamSize(filestream);
    struct PPMHeader header = getHeader(filestream);
    std::bitset<8> hidden_binary, native_binary, binary_to_hide;
-   std::bitset<2> subset_to_hide;
+   if(not isImageHideable(filestream, filestream_to_hide)) {
+      std::cout << "Recipient image is not enough large" << std::endl;
+      return;
+   }
    output_filestream << header.type << std::endl 
                      << header.width << " " << header.height << std::endl
                      << "#" << stream_to_hide_size << std::endl
                      << header.max_color_value;
-   for(size_t s=0; s < stream_to_hide_size; s++) {
+   for(unsigned int s=0; s < stream_to_hide_size; s++) {
       filestream_to_hide.get(binary_to_hide_char);
       binary_to_hide = binary_to_hide_char;
       for(int i=0; i < 8; i+=2) {
          filestream.get(native_binary_char);
          hidden_binary = native_binary_char;
-         subset_to_hide[0] = binary_to_hide[i];
-         subset_to_hide[1] = binary_to_hide[i + 1];
          hidden_binary[0] = binary_to_hide[i];
          hidden_binary[1] = binary_to_hide[i + 1];
          output_filestream << char(hidden_binary.to_ulong());
@@ -109,6 +111,12 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
       filestream.get(native_binary_char);
       output_filestream << native_binary_char;
    }
+}
+
+bool isImageHideable(std::ifstream& filestream, std::ifstream& output_filestream) {
+   const size_t recipient_size = getStreamSize(filestream);
+   const size_t source_size = getStreamSize(output_filestream);
+   return source_size * 4 < recipient_size;
 }
 
 size_t getStreamSize(std::ifstream& filestream) {
