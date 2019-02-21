@@ -73,7 +73,6 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
    struct PPMHeader header = getHeader(filestream);
    std::bitset<8> hidden_binary, native_binary, binary_to_hide;
    std::bitset<2> subset_to_hide;
-   dumpHeader(header);
    output_filestream << header.type << std::endl 
                      << header.width << " " << header.height << std::endl
                      << header.max_color_value;
@@ -81,18 +80,14 @@ void hide(std::ifstream& filestream, std::ifstream& filestream_to_hide, std::ofs
    for(size_t s=0; s < stream_to_hide_size; s++) {
       filestream_to_hide.get(binary_to_hide_char);
       binary_to_hide = binary_to_hide_char;
-      //std::cout << std::endl << "Hiding " << binary_to_hide << std::endl;
       for(int i=0; i < 8; i+=2) {
          filestream.get(native_binary_char);
          hidden_binary = native_binary_char;
-         subset_to_hide[0] = binary_to_hide[i];
-         subset_to_hide[1] = binary_to_hide[i + 1];
          hidden_binary[0] = binary_to_hide[i];
          hidden_binary[1] = binary_to_hide[i + 1];
          output_filestream << char(hidden_binary.to_ulong());
       }
    }
-   // Fill the rest of the file
    for(size_t s=stream_to_hide_size; s < native_stream_size; s++) {
       filestream.get(native_binary_char);
       output_filestream << native_binary_char;
